@@ -1,0 +1,100 @@
+import { Request, Response } from "express";
+import { User } from "../models/User.js";
+import { generateToken } from "../utils/generateToken.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import type { AuthRequest } from "../middleware/authMiddleware.js";
+
+//setting the cookie
+function setTokenCookie(res: Response, token: string) {
+  res.cookie("token", token, {
+    httpOnly: true, //js running in the browser cannot access this cookie
+    secure: process.env.NODE_ENV === "production", //only send over HTTPS
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+}
+
+//get the details from body
+//if existing, throw error
+//if not, create user
+//set token
+//return res
+export const registerUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      throw new ApiError(400, "Name, email, and password are required");
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw new ApiError(409, "User already exists with this email");
+    }
+
+    const user = await User.create({ name, email, password });
+    const token = generateToken(user._id.toString());
+
+    setTokenCookie(res, token);
+
+    res.status(201).json(
+      new ApiResponse(
+        201,
+        {
+          user: { id: user._id, name: user.name, email: user.email },
+          token, // also returned in body for the Bearer fallback
+        },
+        "User registered successfully",
+      ),
+    );
+  },
+);
+
+//login user
+export const loginUser = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required");
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ApiError(401, "Invalid email or password");
+  }
+
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) {
+    throw new ApiError(401, "Invalid email or password");
+  }
+
+  const token = generateToken(user._id.toString());
+  setTokenCookie(res, token);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: { id: user._id, name: user.name, email: user.email },
+        token,
+      },
+      "Login successful",
+    ),
+  );
+});
+
+//logout user
+export const logoutUser = asyncHandler(async (_req: Request, res: Response) => {
+  res.clearCookie("token");
+  res.status(200).json(new ApiResponse(200, null, "Logged out successfully"));
+});
+
+//current user
+//this will be a protected route, only accessible after loging in
+export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await User.findById(req.userId).select("-password");
+  if (!user) throw new ApiError(404, "User not found");
+  res.status(200).json(new ApiResponse(200, user, "Current user fetched"));
+});
