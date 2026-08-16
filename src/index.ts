@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import mongoose from "mongoose";
 
 dotenv.config();
 
@@ -21,7 +22,18 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", message: "Server is running" });
+  const dbStates: Record<number, string> = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+
+  res.json({
+    status: "ok",
+    message: "Server is running",
+    database: dbStates[mongoose.connection.readyState] ?? "unknown",
+  });
 });
 
 app.use("/api/auth", authRoutes);

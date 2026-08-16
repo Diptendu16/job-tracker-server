@@ -25,10 +25,6 @@ export const registerUser = asyncHandler(
   async (req: Request, res: Response) => {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      throw new ApiError(400, "Name, email, and password are required");
-    }
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       throw new ApiError(409, "User already exists with this email");
@@ -55,10 +51,6 @@ export const registerUser = asyncHandler(
 //login user
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
-
-  if (!email || !password) {
-    throw new ApiError(400, "Email and password are required");
-  }
 
   const user = await User.findOne({ email });
   if (!user) {
