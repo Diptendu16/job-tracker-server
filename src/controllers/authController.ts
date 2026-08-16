@@ -5,6 +5,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import type { AuthRequest } from "../middleware/authMiddleware.js";
+import { Workspace } from "../models/Workspace.js";
+import { Membership } from "../models/Membership.js";
 
 //setting the cookie
 function setTokenCookie(res: Response, token: string) {
@@ -16,37 +18,44 @@ function setTokenCookie(res: Response, token: string) {
   });
 }
 
-//get the details from body
-//if existing, throw error
-//if not, create user
-//set token
-//return res
-export const registerUser = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { name, email, password } = req.body;
+export const registerUser = asyncHandler(async (req: Request, res: Response) => {
+  const { name, email, password } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      throw new ApiError(409, "User already exists with this email");
-    }
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new ApiError(409, "User already exists with this email");
+  }
 
-    const user = await User.create({ name, email, password });
-    const token = generateToken(user._id.toString());
+  const user = await User.create({ name, email, password });
 
-    setTokenCookie(res, token);
+  // Auto-create a personal workspace for the new user
+  const workspace = await Workspace.create({
+    name: `${user.name}'s Workspace`,
+    owner: user._id,
+    isPersonal: true,
+  });
 
-    res.status(201).json(
-      new ApiResponse(
-        201,
-        {
-          user: { id: user._id, name: user.name, email: user.email },
-          token, // also returned in body for the Bearer fallback
-        },
-        "User registered successfully",
-      ),
-    );
-  },
-);
+  await Membership.create({
+    workspace: workspace._id,
+    user: user._id,
+    role: "OWNER",
+  });
+
+  const token = generateToken(user._id.toString());
+  setTokenCookie(res, token);
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      {
+        user: { id: user._id, name: user.name, email: user.email },
+        workspace: { id: workspace._id, name: workspace.name },
+        token,
+      },
+      "User registered successfully"
+    )
+  );
+});
 
 //login user
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
