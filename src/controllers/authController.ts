@@ -18,58 +18,61 @@ function setTokenCookie(res: Response, token: string) {
   });
 }
 
-export const registerUser = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
+export const registerUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { name, email, password } = req.body;
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new ApiError(409, "User already exists with this email");
-  }
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw new ApiError(409, "User already exists with this email");
+    }
 
-  const user = await User.create({ name, email, password });
+    const user = await User.create({ name, email, password });
 
-  // Auto-create a personal workspace for the new user
-  const workspace = await Workspace.create({
-    name: `${user.name}'s Workspace`,
-    owner: user._id,
-    isPersonal: true,
-  });
+    // Auto-create a personal workspace for the new user
+    const workspace = await Workspace.create({
+      name: `${user.name}'s Workspace`,
+      owner: user._id,
+      isPersonal: true,
+    });
 
-  await Membership.create({
-    workspace: workspace._id,
-    user: user._id,
-    role: "OWNER",
-  });
+    await Membership.create({
+      workspace: workspace._id,
+      user: user._id,
+      role: "OWNER",
+    });
 
-  const token = generateToken(user._id.toString());
-  setTokenCookie(res, token);
+    const token = generateToken(user._id.toString());
+    setTokenCookie(res, token);
 
-  res.status(201).json(
-    new ApiResponse(
-      201,
-      {
-        user: { id: user._id, name: user.name, email: user.email },
-        workspace: { id: workspace._id, name: workspace.name },
-        token,
-      },
-      "User registered successfully"
-    )
-  );
-});
+    res.status(201).json(
+      new ApiResponse(
+        201,
+        {
+          user: { id: user._id, name: user.name, email: user.email },
+          workspace: { id: workspace._id, name: workspace.name },
+          token,
+        },
+        "User registered successfully",
+      ),
+    );
+  },
+);
 
 //login user
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });
-  if (!user) {
-    throw new ApiError(401, "Invalid email or password");
-  }
+  if (!user) throw new ApiError(401, "Invalid email or password");
 
   const isMatch = await user.comparePassword(password);
-  if (!isMatch) {
-    throw new ApiError(401, "Invalid email or password");
-  }
+  if (!isMatch) throw new ApiError(401, "Invalid email or password");
+
+  const workspace = await Workspace.findOne({
+    owner: user._id,
+    isPersonal: true,
+  });
 
   const token = generateToken(user._id.toString());
   setTokenCookie(res, token);
@@ -79,6 +82,9 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
       200,
       {
         user: { id: user._id, name: user.name, email: user.email },
+        workspace: workspace
+          ? { id: workspace._id, name: workspace.name }
+          : null,
         token,
       },
       "Login successful",
@@ -97,5 +103,13 @@ export const logoutUser = asyncHandler(async (_req: Request, res: Response) => {
 export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await User.findById(req.userId).select("-password");
   if (!user) throw new ApiError(404, "User not found");
-  res.status(200).json(new ApiResponse(200, user, "Current user fetched"));
+
+  const workspace = await Workspace.findOne({
+    owner: req.userId,
+    isPersonal: true,
+  });
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, { user, workspace }, "Current user fetched"));
 });
