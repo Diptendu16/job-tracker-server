@@ -10,6 +10,7 @@ import {
 } from "../validators/applicationValidators.js";
 import {
   listApplicationsHandler,
+  listBoardApplicationsHandler,
   getApplicationHandler,
   createApplicationHandler,
   updateApplicationHandler,
@@ -22,6 +23,7 @@ router.use(protect, requireWorkspaceMembership);
 
 router.get("/", validateQuery(applicationQuerySchema), listApplicationsHandler);
 router.post("/", validate(createApplicationSchema), createApplicationHandler);
+router.get("/board", listBoardApplicationsHandler);
 router.get("/:id", validateObjectId("id"), getApplicationHandler);
 router.patch(
   "/:id",

@@ -104,10 +104,13 @@ export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await User.findById(req.userId).select("-password");
   if (!user) throw new ApiError(404, "User not found");
 
-  const workspace = await Workspace.findOne({
+  const workspaceDoc = await Workspace.findOne({
     owner: req.userId,
     isPersonal: true,
   });
+  const workspace = workspaceDoc
+    ? { id: workspaceDoc._id, name: workspaceDoc.name }
+    : null;
 
   res
     .status(200)

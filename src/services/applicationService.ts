@@ -12,6 +12,10 @@ interface ListParams {
   order: "asc" | "desc";
 }
 
+export async function listAllApplicationsForBoard(workspaceId: string) {
+  return Application.find({ workspace: workspaceId }).sort({ createdAt: -1 });
+}
+
 export async function listApplications(params: ListParams) {
   const { workspaceId, page, limit, status, platform, company, sortBy, order } =
     params;

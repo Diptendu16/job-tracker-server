@@ -16,6 +16,17 @@ export const listApplicationsHandler = asyncHandler(
   },
 );
 
+export const listBoardApplicationsHandler = asyncHandler(
+  async (req: WorkspaceRequest, res: Response) => {
+    const applications = await applicationService.listAllApplicationsForBoard(
+      req.params.workspaceId as string,
+    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, applications, "Board applications fetched"));
+  },
+);
+
 export const getApplicationHandler = asyncHandler(
   async (req: WorkspaceRequest, res: Response) => {
     const application = await applicationService.getApplicationById(
