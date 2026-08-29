@@ -12,6 +12,10 @@ interface ListParams {
   order: "asc" | "desc";
 }
 
+const ACTIVE_STATUSES = ["APPLIED", "OA", "INTERVIEW"];
+const STALE_DAYS = 7;
+const DEADLINE_WARNING_DAYS = 3;
+
 export async function listAllApplicationsForBoard(workspaceId: string) {
   return Application.find({ workspace: workspaceId }).sort({ createdAt: -1 });
 }
@@ -77,7 +81,7 @@ export async function updateApplication(
 ) {
   const application = await Application.findOneAndUpdate(
     { _id: id, workspace: workspaceId },
-    data,
+    { ...data, lastActivityAt: new Date() },
     { new: true, runValidators: true },
   );
   if (!application) {
@@ -95,4 +99,38 @@ export async function deleteApplication(workspaceId: string, id: string) {
     throw new ApiError(404, "Application not found");
   }
   return application;
+}
+
+export async function getNeedsAttention(workspaceId: string) {
+  const now = new Date();
+  const staleThreshold = new Date(
+    now.getTime() - STALE_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const deadlineWarningThreshold = new Date(
+    now.getTime() + DEADLINE_WARNING_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  const applications = await Application.find({
+    workspace: workspaceId,
+    status: { $in: ACTIVE_STATUSES },
+    $or: [
+      { deadline: { $lte: deadlineWarningThreshold, $exists: true } },
+      { followUpDate: { $lte: now, $exists: true } },
+      { lastActivityAt: { $lte: staleThreshold } },
+    ],
+  }).sort({ lastActivityAt: 1 }); 
+
+  return applications.map((app) => {
+    const reasons: string[] = [];
+    if (app.deadline && app.deadline <= deadlineWarningThreshold) {
+      reasons.push(app.deadline < now ? "Deadline passed" : "Deadline soon");
+    }
+    if (app.followUpDate && app.followUpDate <= now) {
+      reasons.push("Follow-up due");
+    }
+    if (app.lastActivityAt <= staleThreshold) {
+      reasons.push("Stale (no activity)");
+    }
+    return { application: app, reasons };
+  });
 }

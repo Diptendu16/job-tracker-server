@@ -74,3 +74,16 @@ export const deleteApplicationHandler = asyncHandler(
     res.status(200).json(new ApiResponse(200, null, "Application deleted"));
   },
 );
+
+export const getNeedsAttentionHandler = asyncHandler(
+  async (req: WorkspaceRequest, res: Response) => {
+    const items = await applicationService.getNeedsAttention(
+      req.params.workspaceId as string,
+    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, items, "Needs-attention applications fetched"),
+      );
+  },
+);

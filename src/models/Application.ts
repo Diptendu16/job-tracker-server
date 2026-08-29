@@ -28,6 +28,8 @@ export interface IApplication extends Document {
   deadline?: Date;
   oaDate?: Date;
   interviewDate?: Date;
+  followUpDate?: Date;
+  lastActivityAt: Date;
   notes?: string;
   resumeVersion?: Types.ObjectId;
 }
@@ -68,6 +70,8 @@ const applicationSchema = new Schema<IApplication>(
     interviewDate: { type: Date },
     notes: { type: String, trim: true },
     resumeVersion: { type: Schema.Types.ObjectId, ref: "ResumeVersion" },
+    followUpDate: { type: Date },
+    lastActivityAt: { type: Date, default: Date.now, required: true },
   },
   { timestamps: true },
 );

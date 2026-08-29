@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const optionalDate = z.preprocess((val) => {
+  if (val === "" || val === undefined || val === null) return undefined;
+  return new Date(val as string);
+}, z.date().optional());
+
 const platformEnum = z.enum([
   "INTERNSHALA",
   "LINKEDIN",
@@ -19,11 +24,17 @@ export const createApplicationSchema = z.object({
   platform: platformEnum,
   status: statusEnum.optional().default("APPLIED"),
   appliedDate: z.coerce.date({ message: "Valid applied date is required" }),
-  deadline: z.coerce.date().optional(),
-  oaDate: z.coerce.date().optional(),
-  interviewDate: z.coerce.date().optional(),
+  deadline: optionalDate,
+  oaDate: optionalDate,
+  interviewDate: optionalDate,
+  followUpDate: optionalDate,
   notes: z.string().trim().optional(),
-  resumeVersion: z.string().trim().optional().or(z.literal("")),
+  resumeVersion: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((val) => (val === "" ? undefined : val)),
 });
 
 export const updateApplicationSchema = createApplicationSchema.partial();
