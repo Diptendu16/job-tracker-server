@@ -23,6 +23,7 @@ export const createApplicationSchema = z.object({
   oaDate: z.coerce.date().optional(),
   interviewDate: z.coerce.date().optional(),
   notes: z.string().trim().optional(),
+  resumeVersion: z.string().trim().optional().or(z.literal("")),
 });
 
 export const updateApplicationSchema = createApplicationSchema.partial();

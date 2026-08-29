@@ -29,7 +29,7 @@ export interface IApplication extends Document {
   oaDate?: Date;
   interviewDate?: Date;
   notes?: string;
-  // resumeVersion added in Phase 5
+  resumeVersion?: Types.ObjectId;
 }
 
 const applicationSchema = new Schema<IApplication>(
@@ -67,6 +67,7 @@ const applicationSchema = new Schema<IApplication>(
     oaDate: { type: Date },
     interviewDate: { type: Date },
     notes: { type: String, trim: true },
+    resumeVersion: { type: Schema.Types.ObjectId, ref: "ResumeVersion" },
   },
   { timestamps: true },
 );
