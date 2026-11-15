@@ -2,16 +2,19 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
+import { createServer } from "http";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
-import { errorHandler } from "./middleware/errorHandler.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
-
-import mongoose from "mongoose";
+import inviteRoutes from "./routes/inviteRoutes.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import { initSocket } from "./socket/index.js";
 
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 app.use(
@@ -30,7 +33,6 @@ app.get("/api/health", (_req, res) => {
     2: "connecting",
     3: "disconnecting",
   };
-
   res.json({
     status: "ok",
     message: "Server is running",
@@ -40,12 +42,15 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/workspaces", workspaceRoutes);
+app.use("/api/invites", inviteRoutes);
 
 app.use(errorHandler);
 
+initSocket(httpServer);
+
 async function startServer() {
   await connectDB();
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
