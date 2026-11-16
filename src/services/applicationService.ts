@@ -16,6 +16,25 @@ const ACTIVE_STATUSES = ["APPLIED", "OA", "INTERVIEW"];
 const STALE_DAYS = 7;
 const DEADLINE_WARNING_DAYS = 3;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Stored dates are midnight UTC of the calendar date the user picked. To compare like with like,
+// "today" must also be midnight UTC of the user's own calendar date, not the current instant.
+function resolveTodayStart(today: string | undefined, now: Date): Date {
+  if (today) {
+    const parsed = new Date(`${today}T00:00:00.000Z`);
+    // Rejects impossible dates like 2026-02-31, which JS would silently roll over to March
+    if (
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.toISOString().startsWith(today)
+    ) {
+      return parsed;
+    }
+  }
+  // No usable date from the client: fall back to the server's current UTC date
+  return new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+}
+
 export async function listAllApplicationsForBoard(workspaceId: string) {
   return Application.find({ workspace: workspaceId }).sort({ createdAt: -1 });
 }
@@ -101,13 +120,12 @@ export async function deleteApplication(workspaceId: string, id: string) {
   return application;
 }
 
-export async function getNeedsAttention(workspaceId: string) {
+export async function getNeedsAttention(workspaceId: string, today?: string) {
   const now = new Date();
-  const staleThreshold = new Date(
-    now.getTime() - STALE_DAYS * 24 * 60 * 60 * 1000,
-  );
+  const todayStart = resolveTodayStart(today, now);
+  const staleThreshold = new Date(now.getTime() - STALE_DAYS * DAY_MS);
   const deadlineWarningThreshold = new Date(
-    now.getTime() + DEADLINE_WARNING_DAYS * 24 * 60 * 60 * 1000,
+    todayStart.getTime() + DEADLINE_WARNING_DAYS * DAY_MS,
   );
 
   const applications = await Application.find({
@@ -115,17 +133,19 @@ export async function getNeedsAttention(workspaceId: string) {
     status: { $in: ACTIVE_STATUSES },
     $or: [
       { deadline: { $lte: deadlineWarningThreshold, $exists: true } },
-      { followUpDate: { $lte: now, $exists: true } },
+      { followUpDate: { $lte: todayStart, $exists: true } },
       { lastActivityAt: { $lte: staleThreshold } },
     ],
-  }).sort({ lastActivityAt: 1 }); 
+  }).sort({ lastActivityAt: 1 });
 
   return applications.map((app) => {
     const reasons: string[] = [];
     if (app.deadline && app.deadline <= deadlineWarningThreshold) {
-      reasons.push(app.deadline < now ? "Deadline passed" : "Deadline soon");
+      reasons.push(
+        app.deadline < todayStart ? "Deadline passed" : "Deadline soon",
+      );
     }
-    if (app.followUpDate && app.followUpDate <= now) {
+    if (app.followUpDate && app.followUpDate <= todayStart) {
       reasons.push("Follow-up due");
     }
     if (app.lastActivityAt <= staleThreshold) {

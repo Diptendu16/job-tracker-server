@@ -51,3 +51,10 @@ export const applicationQuerySchema = z.object({
     .default("createdAt"),
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
+
+export const needsAttentionQuerySchema = z.object({
+  today: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "today must be in YYYY-MM-DD format")
+    .optional(),
+});

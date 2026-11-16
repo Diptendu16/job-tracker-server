@@ -6,18 +6,16 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 export interface AuthRequest extends Request {
   userId?: string;
+  userName?: string;
 }
 
 export const protect = asyncHandler(
   async (req: AuthRequest, _res: Response, next: NextFunction) => {
     let token: string | undefined;
 
-    // 1. Prefer the httpOnly cookie
     if (req.cookies?.token) {
       token = req.cookies.token;
-    }
-    // 2. Fallback to Authorization header (needed for Safari/iOS cross-site cookie issues)
-    else if (req.headers.authorization?.startsWith("Bearer ")) {
+    } else if (req.headers.authorization?.startsWith("Bearer ")) {
       token = req.headers.authorization.split(" ")[1];
     }
 
@@ -36,6 +34,7 @@ export const protect = asyncHandler(
     }
 
     req.userId = decoded.id;
+    req.userName = user.name;
     next();
   },
 );

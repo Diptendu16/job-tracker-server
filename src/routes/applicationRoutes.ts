@@ -7,6 +7,7 @@ import {
   createApplicationSchema,
   updateApplicationSchema,
   applicationQuerySchema,
+  needsAttentionQuerySchema,
 } from "../validators/applicationValidators.js";
 import {
   listApplicationsHandler,
@@ -25,7 +26,11 @@ router.use(protect, requireWorkspaceMembership);
 router.get("/", validateQuery(applicationQuerySchema), listApplicationsHandler);
 router.post("/", validate(createApplicationSchema), createApplicationHandler);
 router.get("/board", listBoardApplicationsHandler);
-router.get("/needs-attention", getNeedsAttentionHandler);
+router.get(
+  "/needs-attention",
+  validateQuery(needsAttentionQuerySchema),
+  getNeedsAttentionHandler,
+);
 router.get("/:id", validateObjectId("id"), getApplicationHandler);
 router.patch(
   "/:id",
