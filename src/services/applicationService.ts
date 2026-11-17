@@ -98,15 +98,21 @@ export async function updateApplication(
   id: string,
   data: Partial<IApplication>,
 ) {
+  // Read the current status first, so the feed can say "from X to Y"
+  const existing = await Application.findOne({
+    _id: id,
+    workspace: workspaceId,
+  }).select("status");
+  if (!existing) throw new ApiError(404, "Application not found");
+
   const application = await Application.findOneAndUpdate(
     { _id: id, workspace: workspaceId },
     { ...data, lastActivityAt: new Date() },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
-  if (!application) {
-    throw new ApiError(404, "Application not found");
-  }
-  return application;
+  if (!application) throw new ApiError(404, "Application not found");
+
+  return { application, previousStatus: existing.status };
 }
 
 export async function deleteApplication(workspaceId: string, id: string) {

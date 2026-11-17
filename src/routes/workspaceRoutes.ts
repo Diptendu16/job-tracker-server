@@ -4,6 +4,7 @@ import { requireWorkspaceMembership } from "../middleware/workspaceAuth.js";
 import applicationRoutes from "./applicationRoutes.js";
 import resumeVersionRoutes from "./resumeVersionRoutes.js";
 import analyticsRoutes from "./analyticsRoutes.js";
+import activityRoutes from "./activityRoutes.js";
 import {
   listWorkspacesHandler,
   createInviteHandler,
@@ -22,5 +23,6 @@ router.post(
 router.use("/:workspaceId/applications", applicationRoutes);
 router.use("/:workspaceId/resume-versions", resumeVersionRoutes);
 router.use("/:workspaceId/analytics", analyticsRoutes);
+router.use("/:workspaceId/activity", activityRoutes);
 
 export default router;

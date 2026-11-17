@@ -23,18 +23,18 @@ export async function acceptInvite(token: string, userId: string) {
     workspace: invite.workspace,
     user: userId,
   });
+  let joined = false;
   if (!existing) {
     await Membership.create({
       workspace: invite.workspace,
       user: userId,
       role: "MEMBER",
     });
+    joined = true;
   }
-  // If already a member, silently succeed instead of erroring —
-  // clicking your own invite link again shouldn't be a failure case.
 
   const ws = await Workspace.findById(invite.workspace);
   if (!ws) throw new ApiError(404, "Workspace no longer exists");
 
-  return { id: ws._id.toString(), name: ws.name };
+  return { id: ws._id.toString(), name: ws.name, joined };
 }

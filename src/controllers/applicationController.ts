@@ -3,6 +3,7 @@ import * as applicationService from "../services/applicationService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { emitToWorkspace, getSocketIdFromRequest } from "../socket/emit.js";
+import { logActivity } from "../utils/logActivity.js";
 import type { WorkspaceRequest } from "../middleware/workspaceAuth.js";
 
 function getActor(req: WorkspaceRequest) {
@@ -75,6 +76,17 @@ export const createApplicationHandler = asyncHandler(
       getSocketIdFromRequest(req),
     );
 
+    await logActivity({
+      workspaceId,
+      actor: getActor(req),
+      type: "APPLICATION_CREATED",
+      application: {
+        id: application._id.toString(),
+        company: application.company,
+        role: application.role,
+      },
+    });
+
     res
       .status(201)
       .json(new ApiResponse(201, application, "Application created"));
@@ -84,11 +96,12 @@ export const createApplicationHandler = asyncHandler(
 export const updateApplicationHandler = asyncHandler(
   async (req: WorkspaceRequest, res: Response) => {
     const workspaceId = req.params.workspaceId as string;
-    const application = await applicationService.updateApplication(
-      workspaceId,
-      req.params.id as string,
-      req.body,
-    );
+    const { application, previousStatus } =
+      await applicationService.updateApplication(
+        workspaceId,
+        req.params.id as string,
+        req.body,
+      );
 
     emitToWorkspace(
       workspaceId,
@@ -96,6 +109,22 @@ export const updateApplicationHandler = asyncHandler(
       { workspaceId, application, actor: getActor(req) },
       getSocketIdFromRequest(req),
     );
+
+    // Only status changes are worth a feed entry; note/date edits are skipped
+    if (previousStatus !== application.status) {
+      await logActivity({
+        workspaceId,
+        actor: getActor(req),
+        type: "STATUS_CHANGED",
+        application: {
+          id: application._id.toString(),
+          company: application.company,
+          role: application.role,
+        },
+        fromStatus: previousStatus,
+        toStatus: application.status,
+      });
+    }
 
     res
       .status(200)
@@ -107,7 +136,10 @@ export const deleteApplicationHandler = asyncHandler(
   async (req: WorkspaceRequest, res: Response) => {
     const workspaceId = req.params.workspaceId as string;
     const applicationId = req.params.id as string;
-    await applicationService.deleteApplication(workspaceId, applicationId);
+    const deleted = await applicationService.deleteApplication(
+      workspaceId,
+      applicationId,
+    );
 
     emitToWorkspace(
       workspaceId,
@@ -120,6 +152,17 @@ export const deleteApplicationHandler = asyncHandler(
       },
       getSocketIdFromRequest(req),
     );
+
+    await logActivity({
+      workspaceId,
+      actor: getActor(req),
+      type: "APPLICATION_DELETED",
+      application: {
+        id: applicationId,
+        company: deleted.company,
+        role: deleted.role,
+      },
+    });
 
     res.status(200).json(new ApiResponse(200, null, "Application deleted"));
   },

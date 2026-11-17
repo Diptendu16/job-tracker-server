@@ -114,5 +114,14 @@ export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
 
   res
     .status(200)
-    .json(new ApiResponse(200, { user, workspace }, "Current user fetched"));
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: { id: user._id, name: user.name, email: user.email },
+          workspace,
+        },
+        "Current user fetched",
+      ),
+    );
 });
