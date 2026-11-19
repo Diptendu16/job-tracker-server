@@ -10,8 +10,21 @@ export const listActivityHandler = asyncHandler(
       .validatedQuery;
     const entries = await activityService.listActivity(
       req.params.workspaceId as string,
+      req.userId!,
       limit,
     );
     res.status(200).json(new ApiResponse(200, entries, "Activity fetched"));
+  },
+);
+
+export const clearActivityHandler = asyncHandler(
+  async (req: WorkspaceRequest, res: Response) => {
+    const clearedAt = await activityService.clearActivity(
+      req.params.workspaceId as string,
+      req.userId!,
+    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, { clearedAt }, "Activity cleared"));
   },
 );

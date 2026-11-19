@@ -22,6 +22,7 @@ export interface IActivity extends Document {
 }
 
 const STATUSES = ["APPLIED", "OA", "INTERVIEW", "OFFER", "REJECTED"];
+const RETENTION_DAYS = 90;
 
 const activitySchema = new Schema<IActivity>(
   {
@@ -56,8 +57,10 @@ const activitySchema = new Schema<IActivity>(
   { timestamps: { createdAt: true, updatedAt: false } },
 );
 
-// The feed's only query: newest entries for one workspace
-activitySchema.index({ workspace: 1, createdAt: -1 });
+activitySchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: RETENTION_DAYS * 24 * 60 * 60 },
+);
 
 export const Activity: Model<IActivity> = mongoose.model<IActivity>(
   "Activity",
