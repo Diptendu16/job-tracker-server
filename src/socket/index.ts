@@ -9,6 +9,8 @@ interface AuthenticatedSocket extends Socket {
 }
 
 let io: SocketIOServer | null = null;
+const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
+type Ack = (response: { success: boolean; message?: string }) => void;
 
 export function initSocket(httpServer: HttpServer) {
   io = new SocketIOServer(httpServer, {
@@ -48,31 +50,51 @@ export function initSocket(httpServer: HttpServer) {
   io.on("connection", (socket: AuthenticatedSocket) => {
     console.log(`Socket connected: ${socket.id} (user ${socket.userId})`);
 
-    socket.on("workspace:join", async (workspaceId: string, callback) => {
-      try {
-        const membership = await Membership.findOne({
-          workspace: workspaceId,
-          user: socket.userId,
-        });
+    socket.on(
+      "workspace:join",
+      async (workspaceId: unknown, callback?: unknown) => {
+        // The callback comes from the client too, so never assume it is a function
+        const ack: Ack = (response) => {
+          if (typeof callback === "function") (callback as Ack)(response);
+        };
 
-        if (!membership) {
-          callback?.({
-            success: false,
-            message: "Not a member of this workspace",
-          });
+        if (
+          typeof workspaceId !== "string" ||
+          !OBJECT_ID_PATTERN.test(workspaceId)
+        ) {
+          ack({ success: false, message: "Invalid workspace ID" });
           return;
         }
 
-        socket.join(workspaceId);
-        callback?.({ success: true });
-        console.log(`Socket ${socket.id} joined workspace room ${workspaceId}`);
-      } catch {
-        callback?.({ success: false, message: "Failed to join workspace" });
-      }
-    });
+        try {
+          const membership = await Membership.findOne({
+            workspace: workspaceId,
+            user: socket.userId,
+          });
 
-    socket.on("workspace:leave", (workspaceId: string) => {
-      socket.leave(workspaceId);
+          if (!membership) {
+            ack({ success: false, message: "Not a member of this workspace" });
+            return;
+          }
+
+          socket.join(workspaceId);
+          ack({ success: true });
+          console.log(
+            `Socket ${socket.id} joined workspace room ${workspaceId}`,
+          );
+        } catch {
+          ack({ success: false, message: "Failed to join workspace" });
+        }
+      },
+    );
+
+    socket.on("workspace:leave", (workspaceId: unknown) => {
+      if (
+        typeof workspaceId === "string" &&
+        OBJECT_ID_PATTERN.test(workspaceId)
+      ) {
+        socket.leave(workspaceId);
+      }
     });
 
     socket.on("disconnect", () => {

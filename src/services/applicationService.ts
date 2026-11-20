@@ -1,5 +1,7 @@
 import { Application, IApplication } from "../models/Application.js";
 import { ApiError } from "../utils/ApiError.js";
+import type { UpdateQuery } from "mongoose";
+import { ResumeVersion } from "../models/ResumeVersion.js";
 
 interface ListParams {
   workspaceId: string;
@@ -81,13 +83,44 @@ export async function getApplicationById(workspaceId: string, id: string) {
   return application;
 }
 
+// null means "clear this field", undefined means "not provided"
+function splitUpdate(data: Record<string, unknown>) {
+  const set: Record<string, unknown> = {};
+  const unset: Record<string, 1> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    if (value === null) unset[key] = 1;
+    else set[key] = value;
+  }
+  return { set, unset };
+}
+
+// Stops an application from pointing at a resume version that belongs to another workspace
+async function assertResumeVersionInWorkspace(
+  workspaceId: string,
+  resumeVersionId: unknown,
+) {
+  if (typeof resumeVersionId !== "string") return;
+  const exists = await ResumeVersion.exists({
+    _id: resumeVersionId,
+    workspace: workspaceId,
+  });
+  if (!exists) {
+    throw new ApiError(400, "Resume version not found in this workspace");
+  }
+}
+
 export async function createApplication(
   workspaceId: string,
   userId: string,
-  data: Partial<IApplication>,
+  data: Record<string, unknown>,
 ) {
+  // On create there is nothing to clear, so null values are simply dropped
+  const { set } = splitUpdate(data);
+  await assertResumeVersionInWorkspace(workspaceId, set.resumeVersion);
+
   return Application.create({
-    ...data,
+    ...set,
     workspace: workspaceId,
     createdBy: userId,
   });
@@ -96,18 +129,26 @@ export async function createApplication(
 export async function updateApplication(
   workspaceId: string,
   id: string,
-  data: Partial<IApplication>,
+  data: Record<string, unknown>,
 ) {
-  // Read the current status first, so the feed can say "from X to Y"
+  const { set, unset } = splitUpdate(data);
+  await assertResumeVersionInWorkspace(workspaceId, set.resumeVersion);
+
+  // Read the current status first, so the activity feed can say "from X to Y"
   const existing = await Application.findOne({
     _id: id,
     workspace: workspaceId,
   }).select("status");
   if (!existing) throw new ApiError(404, "Application not found");
 
+  const update: Record<string, unknown> = {
+    $set: { ...set, lastActivityAt: new Date() },
+  };
+  if (Object.keys(unset).length > 0) update.$unset = unset;
+
   const application = await Application.findOneAndUpdate(
     { _id: id, workspace: workspaceId },
-    { ...data, lastActivityAt: new Date() },
+    update as UpdateQuery<IApplication>,
     { returnDocument: "after", runValidators: true },
   );
   if (!application) throw new ApiError(404, "Application not found");
